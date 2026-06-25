@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row justify-content-center mt-4">
+    <div class="col-md-9 text-center">
+        <h2><i class="bi bi-keyboard"></i> Band 12 Typing Challenge</h2>
+        <p class="text-muted">Type the phrase exactly as shown. Follow the highlighted letters.</p>
+        
+        <div class="card shadow-lg mt-4 border-0">
+            <div class="card-body p-5 rounded">
+                <span class="badge bg-primary mb-3 fs-6 shadow-sm" id="phrase-category">Category</span>
+                
+                <!-- The Dynamic Target Text -->
+                <h3 class="mb-4 lh-base" id="target-text" style="font-family: monospace; font-size: 1.5rem;">
+                    Loading phrase...
+                </h3>
+                
+                <textarea id="typing-input" class="form-control form-control-lg mb-3 shadow-sm border-2" rows="3" placeholder="Start typing here..." autocomplete="off" spellcheck="false"></textarea>
+                
+                <div class="d-flex justify-content-between text-muted fw-bold fs-5 px-2">
+                    <span><i class="bi bi-speedometer2"></i> WPM: <span id="wpm" class="text-success">0</span></span>
+                    <span><i class="bi bi-bullseye"></i> Accuracy: <span id="accuracy" class="text-info">100</span>%</span>
+                </div>
+            </div>
+        </div>
+        <button class="btn btn-outline-secondary mt-4 px-4 py-2" onclick="nextPhrase()">Skip Phrase <i class="bi bi-arrow-right"></i></button>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const phrases = [
+        {% for p in phrases %}
+        { text: `{{ p.phrase | safe }}`, category: "{{ p.category }}" },
+        {% endfor %}
+    ];
+    
+    let currentIndex = Math.floor(Math.random() * phrases.length);
+    let targetText = phrases[currentIndex].text;
+    let startTime = null;
+
+    const targetEl = document.getElementById('target-text');
+    const inputEl = document.getElementById('typing-input');
+    const wpmEl = document.getElementById('wpm');
+    const accEl = document.getElementById('accuracy');
+
+    function renderText(typed) {
+        let matchLen = 0;
+        let hasMistake = false;
+
+        // Calculate how many characters match exactly
+        while(matchLen < typed.length && matchLen < targetText.length && typed[matchLen] === targetText[matchLen]) {
+            matchLen++;
+        }
+
+        if (typed.length > matchLen) {
+            hasMistake = true;
+        }
+
+        const correctPart = targetText.substring(0, matchLen);
+        const nextChar = targetText.substring(matchLen, matchLen + 1); // The exact next letter needed
+        const remainingPart = targetText.substring(matchLen + 1);
+
+        // Render with visual hints:
+        // 1. Green for correct
+        // 2. Red background for the next char if they made a mistake, otherwise a gentle underline
+        // 3. Grey for the rest of the text
+        let html = `<span class="text-success fw-bold">${correctPart}</span>`;
+        
+        if (nextChar) {
+            if (hasMistake) {
+                html += `<span class="bg-danger text-white rounded px-1">${nextChar === ' ' ? '&nbsp;' : nextChar}</span>`;
+            } else {
+                html += `<span class="bg-warning text-dark rounded px-1">${nextChar === ' ' ? '&nbsp;' : nextChar}</span>`;
+            }
+        }
+        
+        html += `<span class="text-secondary opacity-50">${remainingPart}</span>`;
+        
+        targetEl.innerHTML = html;
+
+        return { matchLen, hasMistake };
+    }
+
+    function loadPhrase() {
+        targetText = phrases[currentIndex].text;
+        document.getElementById('phrase-category').innerText = phrases[currentIndex].category;
+        
+        inputEl.value = "";
+        inputEl.disabled = false;
+        inputEl.focus();
+        inputEl.classList.remove('is-valid', 'is-invalid', 'bg-success', 'text-white');
+        
+        startTime = null;
+        wpmEl.innerText = "0";
+        accEl.innerText = "100";
+        
+        renderText("");
+    }
+
+    inputEl.addEventListener('input', () => {
+        if (!startTime) startTime = new Date();
+        
+        const typed = inputEl.value;
+        const state = renderText(typed);
+        let errors = state.hasMistake ? 1 : 0; // simplified error tracking for display
+        
+        if (state.hasMistake) {
+            inputEl.classList.add('border-danger');
+            inputEl.classList.remove('border-success');
+        } else {
+            inputEl.classList.remove('border-danger');
+            inputEl.classList.add('border-success');
+        }
+
+        // Calculate Stats
+        const timeElapsed = (new Date() - startTime) / 1000 / 60; // in minutes
+        const wordsTyped = typed.split(" ").length;
+        if (timeElapsed > 0) wpmEl.innerText = Math.round(wordsTyped / timeElapsed);
+        
+        // Simple accuracy visualizer
+        const acc = Math.max(0, Math.round((state.matchLen / Math.max(1, typed.length)) * 100));
+        accEl.innerText = acc;
+
+        // Check Win
+        if (typed === targetText) {
+            inputEl.disabled = true;
+            inputEl.classList.add('bg-success', 'text-white');
+            setTimeout(() => {
+                nextPhrase();
+            }, 800);
+        }
+    });
+
+    function nextPhrase() {
+        currentIndex = (currentIndex + 1) % phrases.length;
+        loadPhrase();
+    }
+
+    // Initialize first phrase
+    loadPhrase();
+</script>
+{% endblock %}

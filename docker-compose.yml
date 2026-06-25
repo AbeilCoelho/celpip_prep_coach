@@ -1,0 +1,23 @@
+version: '3.8'
+services:
+  web:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://celpip_user:password@db:5432/celpip_db
+    depends_on:
+      - db
+    volumes:
+      - ./data:/app/data  # Mount Excel files so they can be updated live
+  db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=celpip_user
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=celpip_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

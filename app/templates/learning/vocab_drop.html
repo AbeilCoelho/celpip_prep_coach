@@ -1,0 +1,285 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-10 text-center">
+        <h2 class="mb-1"><i class="bi bi-controller text-primary"></i> Vocabulary Drop</h2>
+        <p class="text-muted">Type the correct word to complete the falling sentence!</p>
+        
+        <!-- Pre-Game Screen -->
+        <div id="start-screen" class="card shadow-lg p-5 mt-4">
+            <h3>Ready to Play?</h3>
+            <p>Sentences will fall from the top. Type the missing word from the Word Bank before it hits the bottom.</p>
+            <ul class="list-unstyled text-start d-inline-block mx-auto mb-4">
+                <li>🟢 Correct Word = +10 pts</li>
+                <li>⚡ Fast Answer = +Bonus pts</li>
+                <li>🔥 Streak = Multipliers!</li>
+                <li>💔 Hit Bottom = Lose a life</li>
+            </ul>
+            <button class="btn btn-primary btn-lg" onclick="startGame()">Start Game</button>
+        </div>
+
+        <!-- Main Game UI (Hidden by default) -->
+        <div id="game-ui" class="d-none position-relative mt-3">
+            
+            <!-- HUD -->
+            <div class="d-flex justify-content-between align-items-center bg-dark text-white p-2 rounded-top px-4">
+                <span class="fs-4">Score: <strong id="score-display" class="text-warning">0</strong></span>
+                <span class="fs-4 text-info fw-bold" id="combo-display">Combo x1</span>
+                <span class="fs-4 text-danger" id="lives-display">❤️❤️❤️</span>
+            </div>
+            
+            <!-- Game Canvas Area -->
+            <div id="game-canvas" class="bg-light border position-relative overflow-hidden" style="height: 450px; border-radius: 0 0 10px 10px;">
+                <!-- Falling sentences will be injected here -->
+            </div>
+
+            <!-- Word Bank -->
+            <div class="card mt-3 shadow-sm border-primary">
+                <div class="card-header bg-primary text-white py-1"><strong>Current Word Bank</strong></div>
+                <div class="card-body d-flex justify-content-center flex-wrap gap-2 py-2" id="word-bank">
+                    <!-- Words injected here -->
+                </div>
+            </div>
+
+            <!-- Input Box -->
+            <div class="mt-3">
+                <input type="text" id="game-input" class="form-control form-control-lg text-center fs-3 border-3" placeholder="Type here..." autocomplete="off" spellcheck="false" disabled>
+            </div>
+        </div>
+
+        <!-- Post-Game Screen (Hidden by default) -->
+        <div id="end-screen" class="card shadow-lg p-5 mt-4 d-none border-danger">
+            <h2 class="text-danger fw-bold">Game Over</h2>
+            <h1 class="display-1 text-primary fw-bold" id="final-score">0</h1>
+            <p class="fs-5">Accuracy: <strong id="final-accuracy">0%</strong> | Max Combo: <strong id="final-combo">0</strong></p>
+            
+            <div class="text-start mt-4">
+                <h4 class="text-secondary"><i class="bi bi-journal-x"></i> Words to Review</h4>
+                <ul class="list-group list-group-flush" id="review-list">
+                    <!-- Missed words injected here -->
+                </ul>
+            </div>
+            
+            <div class="mt-4">
+                <button class="btn btn-primary me-2" onclick="location.reload()">Play Again</button>
+                <a href="{{ url_for('learning.leaderboard') }}" class="btn btn-outline-secondary">View Leaderboard</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Floating Text Animation CSS -->
+<style>
+    .floating-text { position: absolute; font-weight: bold; font-size: 1.5rem; color: #198754; animation: floatUp 1s ease-out forwards; z-index: 100;}
+    @keyframes floatUp { 0% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-50px); } }
+    .falling-sentence { position: absolute; width: 90%; left: 5%; background: white; padding: 10px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); font-size: 1.2rem; text-align: center; border: 2px solid #dee2e6; }
+</style>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let allData = [];
+    let currentBank = [];
+    let currentTask = null;
+    let missedWords = [];
+    
+    // Game State
+    let isPlaying = false;
+    let score = 0;
+    let lives = 3;
+    let combo = 0;
+    let maxCombo = 0;
+    let totalAttempts = 0;
+    let correctAttempts = 0;
+    let baseSpeed = 0.7;
+    let speedMultiplier = 1.0;
+    let positionY = 0;
+    let animationFrame;
+
+    const gameCanvas = document.getElementById('game-canvas');
+    const inputEl = document.getElementById('game-input');
+    
+    // 1. Fetch Data
+    fetch("{{ url_for('learning.vocab_drop_data') }}")
+        .then(res => res.json())
+        .then(data => { allData = data; });
+
+    // 2. Start Game
+    function startGame() {
+        if (allData.length < 5) return alert("Not enough vocabulary data loaded! Add more examples in the database.");
+        
+        document.getElementById('start-screen').classList.add('d-none');
+        document.getElementById('game-ui').classList.remove('d-none');
+        
+        inputEl.disabled = false;
+        inputEl.focus();
+        
+        loadNewRound();
+    }
+
+    // 3. Load Word Bank (5 words)
+    function loadNewRound() {
+        let shuffled = [...allData].sort(() => 0.5 - Math.random());
+        currentBank = shuffled.slice(0, 5);
+        
+        const bankEl = document.getElementById('word-bank');
+        bankEl.innerHTML = currentBank.map(w => `<span class="badge bg-secondary fs-6">${w.word}</span>`).join('');
+        
+        spawnSentence();
+    }
+
+    // 4. Spawn Falling Sentence
+    function spawnSentence() {
+        if (lives <= 0) return endGame();
+        
+        // Stop any existing animation loops to prevent double-speed glitches
+        cancelAnimationFrame(animationFrame);
+        
+        currentTask = currentBank[Math.floor(Math.random() * currentBank.length)];
+        positionY = -50;
+        
+        // Remove old sentence if it exists, but keep floating text animations
+        const oldSentence = document.getElementById('active-sentence');
+        if (oldSentence) oldSentence.remove();
+        
+        // Add new sentence
+        gameCanvas.insertAdjacentHTML('beforeend', `<div id="active-sentence" class="falling-sentence">${currentTask.sentence}</div>`);
+        inputEl.value = "";
+        
+        speedMultiplier += 0.05; // Slightly faster every drop
+        isPlaying = true;
+        
+        // Restart the animation loop!
+        gameLoop();
+    }
+
+    // 5. Game Loop
+    function gameLoop() {
+        if (!isPlaying) return;
+        
+        const sentenceEl = document.getElementById('active-sentence');
+        if (sentenceEl) {
+            positionY += (baseSpeed * speedMultiplier);
+            sentenceEl.style.top = positionY + 'px';
+            
+            // Check if hit bottom
+            if (positionY > gameCanvas.clientHeight - 60) {
+                isPlaying = false;
+                handleMiss();
+            }
+        }
+        
+        if (lives > 0) animationFrame = requestAnimationFrame(gameLoop);
+    }
+
+    // 6. Typing Logic
+    inputEl.addEventListener('input', () => {
+        const typed = inputEl.value.trim().toLowerCase();
+        
+        if (currentTask && typed === currentTask.word) {
+            isPlaying = false;
+            handleCorrect();
+        }
+    });
+
+    // 7. Correct Answer
+    function handleCorrect() {
+        totalAttempts++;
+        correctAttempts++;
+        combo++;
+        if (combo > maxCombo) maxCombo = combo;
+        
+        // Calculate points based on height (higher = faster answer = more points)
+        let heightBonus = Math.floor((gameCanvas.clientHeight - positionY) / 10);
+        let pts = (10 + heightBonus) * (1 + (combo * 0.1));
+        pts = Math.round(pts);
+        
+        score += pts;
+        updateHUD();
+        showFloatingText(`+${pts}`, 'text-success');
+        
+        // Remove only the sentence, leave the floating text alone
+        const sentenceEl = document.getElementById('active-sentence');
+        if (sentenceEl) sentenceEl.remove();
+        
+        // Every 5 correct answers, load a fresh batch of 5 words
+        if (correctAttempts % 5 === 0) {
+            setTimeout(loadNewRound, 500);
+        } else {
+            setTimeout(spawnSentence, 500);
+        }
+    }
+
+    // 8. Miss / Hit Bottom
+    function handleMiss() {
+        totalAttempts++;
+        lives--;
+        combo = 0;
+        updateHUD();
+        showFloatingText(`Miss!`, 'text-danger');
+        
+        const sentenceEl = document.getElementById('active-sentence');
+        if (sentenceEl) sentenceEl.remove();
+        
+        if(!missedWords.find(w => w.word === currentTask.word)) {
+            missedWords.push(currentTask);
+        }
+        
+        inputEl.classList.add('bg-danger', 'text-white');
+        setTimeout(() => {
+            inputEl.classList.remove('bg-danger', 'text-white');
+            spawnSentence(); // This will automatically restart gameLoop
+        }, 800);
+    }
+
+    function updateHUD() {
+        document.getElementById('score-display').innerText = score;
+        document.getElementById('combo-display').innerText = combo > 1 ? `Combo x${combo} 🔥` : `Combo x1`;
+        document.getElementById('lives-display').innerText = '❤️'.repeat(lives);
+    }
+
+    function showFloatingText(text, colorClass) {
+        const floatEl = document.createElement('div');
+        floatEl.className = `floating-text ${colorClass}`;
+        floatEl.innerText = text;
+        floatEl.style.left = '50%';
+        floatEl.style.top = '30%'; // Changed to appear higher up
+        gameCanvas.appendChild(floatEl);
+        setTimeout(() => floatEl.remove(), 1000);
+    }
+
+    // 9. Game Over
+    function endGame() {
+        cancelAnimationFrame(animationFrame);
+        isPlaying = false;
+        inputEl.disabled = true;
+        
+        document.getElementById('game-ui').classList.add('d-none');
+        document.getElementById('end-screen').classList.remove('d-none');
+        
+        const accuracy = totalAttempts > 0 ? Math.round((correctAttempts / totalAttempts) * 100) : 0;
+        document.getElementById('final-score').innerText = score;
+        document.getElementById('final-accuracy').innerText = accuracy + "%";
+        document.getElementById('final-combo').innerText = maxCombo;
+        
+        const reviewEl = document.getElementById('review-list');
+        if (missedWords.length === 0) reviewEl.innerHTML = "<li class='list-group-item text-success'>Perfect! No missed words.</li>";
+        else {
+            reviewEl.innerHTML = missedWords.map(w => `
+                <li class="list-group-item">
+                    <strong>${w.word}</strong>: ${w.definition}<br>
+                    <small class="text-muted"><em>${w.sentence.replace('________', `<span class="text-danger border-bottom border-danger fw-bold">${w.word}</span>`)}</em></small>
+                </li>
+            `).join('');
+        }
+
+        fetch("{{ url_for('learning.vocab_drop_save') }}", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({ score: score, accuracy: accuracy, highest_combo: maxCombo })
+        });
+    }
+</script>
+{% endblock %}

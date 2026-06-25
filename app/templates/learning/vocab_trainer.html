@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center mt-5">
+    <div class="col-md-8 text-center">
+        <h2 class="mb-4"><i class="bi bi-spellcheck"></i> Active Vocabulary Trainer</h2>
+        <p class="text-muted mb-4">Read the definition, then type the word to reinforce memory.</p>
+        
+        <!-- Flashcard UI -->
+        <div class="card shadow-lg mb-4" id="flashcard" style="min-height: 350px; transition: transform 0.3s;">
+            
+            <!-- Front of Card (Click to flip) -->
+            <div class="card-body d-flex flex-column justify-content-center align-items-center cursor-pointer" 
+                 id="card-front" onclick="flipCard()" style="cursor: pointer;">
+                <span class="badge bg-secondary mb-3">Band Level: <span id="diff-level"></span></span>
+                <h1 class="display-3 fw-bold text-primary user-select-none" id="vocab-word">Word</h1>
+                <p class="text-muted mt-3"><i class="bi bi-arrow-repeat"></i> Click to reveal definition</p>
+            </div>
+            
+            <!-- Back of Card (Hidden by default) -->
+            <div id="card-back" class="card-body d-none d-flex flex-column justify-content-between p-4">
+                
+                <div class="text-start mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h3 class="text-success mb-0" id="vocab-def-word">Word</h3>
+                        <span class="badge bg-info" id="vocab-category">Category</span>
+                    </div>
+                    <p class="fs-5  border-start border-4 border-success ps-3" id="vocab-def">Definition</p>
+                    
+                    <div class=" p-3 rounded mt-3">
+                        <strong><i class="bi bi-quote"></i> Example:</strong>
+                        <p class="mb-0 fst-italic mt-1" id="vocab-example">Example sentence</p>
+                    </div>
+                </div>
+
+                <!-- Active Recall Typing Challenge -->
+                <div class="mt-auto border-top pt-4">
+                    <label class="form-label fw-bold text-secondary">Type the word to master it:</label>
+                    <div class="input-group input-group-lg">
+                        <span class="input-group-text bg-white" id="spell-icon"><i class="bi bi-keyboard"></i></span>
+                        <input type="text" class="form-control" id="spell-input" placeholder="Type here..." autocomplete="off" spellcheck="false">
+                        <button class="btn btn-primary px-4" id="submit-word-btn" onclick="checkSpelling()" disabled>Submit</button>
+                    </div>
+                    <div id="spell-feedback" class="form-text text-start mt-2" style="min-height: 20px;"></div>
+                </div>
+                
+            </div>
+        </div>
+
+        <!-- Progress Bar -->
+        <div class="progress mt-4 shadow-sm" style="height: 12px; border-radius: 10px;">
+            <div class="progress-bar bg-success progress-bar-striped progress-bar-animated" id="progress-bar" role="progressbar" style="width: 0%"></div>
+        </div>
+        <p class="text-muted mt-2 fw-bold" id="progress-text">0 / 0 words studied</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const words = {{ words | tojson }};
+    let currentIndex = 0;
+    let isFlipped = false;
+    let currentWordObj = null;
+
+    const frontDiv = document.getElementById('card-front');
+    const backDiv = document.getElementById('card-back');
+    const spellInput = document.getElementById('spell-input');
+    const spellFeedback = document.getElementById('spell-feedback');
+    const submitBtn = document.getElementById('submit-word-btn');
+    const spellIcon = document.getElementById('spell-icon');
+
+    function loadCard(index) {
+        if (index >= words.length) {
+            document.getElementById('flashcard').innerHTML = `
+                <div class="card-body d-flex flex-column justify-content-center align-items-center p-5">
+                    <i class="bi bi-trophy-fill text-warning" style="font-size: 4rem;"></i>
+                    <h2 class="text-success mt-3 fw-bold">Session Complete!</h2>
+                    <p class="text-muted">You actively recalled ${words.length} advanced words.</p>
+                    <a href="/" class="btn btn-primary btn-lg mt-3"><i class="bi bi-house-door"></i> Back to Dashboard</a>
+                </div>`;
+            return;
+        }
+
+        currentWordObj = words[index];
+        
+        // Populate Front
+        document.getElementById('vocab-word').innerText = currentWordObj.word;
+        document.getElementById('diff-level').innerText = currentWordObj.difficulty;
+        
+        // Populate Back
+        document.getElementById('vocab-def-word').innerText = currentWordObj.word;
+        document.getElementById('vocab-category').innerText = currentWordObj.category || 'General';
+        document.getElementById('vocab-def').innerText = currentWordObj.definition;
+        document.getElementById('vocab-example').innerText = currentWordObj.example_sentence;
+        
+        // Reset state
+        isFlipped = false;
+        frontDiv.classList.remove('d-none');
+        backDiv.classList.add('d-none');
+        
+        // Reset Input
+        spellInput.value = "";
+        spellInput.disabled = false;
+        spellInput.classList.remove('is-valid', 'is-invalid');
+        spellFeedback.innerHTML = "";
+        submitBtn.disabled = true;
+        submitBtn.classList.remove('btn-success');
+        submitBtn.classList.add('btn-primary');
+        spellIcon.innerHTML = '<i class="bi bi-keyboard"></i>';
+        spellIcon.classList.remove('text-success', 'text-danger');
+        
+        updateProgress();
+    }
+
+    function flipCard() {
+        if (!isFlipped) {
+            frontDiv.classList.add('d-none');
+            backDiv.classList.remove('d-none');
+            isFlipped = true;
+            
+            // Auto focus the input field for seamless typing
+            setTimeout(() => { spellInput.focus(); }, 100);
+        }
+    }
+
+    // Real-time typing validation
+    spellInput.addEventListener('input', () => {
+        const typed = spellInput.value.trim().toLowerCase();
+        const target = currentWordObj.word.toLowerCase();
+        
+        submitBtn.disabled = typed.length === 0;
+
+        if (typed === target) {
+            spellInput.classList.add('is-valid');
+            spellInput.classList.remove('is-invalid');
+            submitBtn.classList.replace('btn-primary', 'btn-success');
+            spellIcon.innerHTML = '<i class="bi bi-check-circle-fill"></i>';
+            spellIcon.classList.add('text-success');
+            spellIcon.classList.remove('text-danger');
+            spellFeedback.innerHTML = '<span class="text-success fw-bold">Perfect spelling! Press Enter or Submit.</span>';
+        } else {
+            spellInput.classList.remove('is-valid');
+            submitBtn.classList.replace('btn-success', 'btn-primary');
+            spellIcon.innerHTML = '<i class="bi bi-keyboard"></i>';
+            spellIcon.classList.remove('text-success');
+            spellFeedback.innerHTML = "";
+        }
+    });
+
+    // Handle Enter Key
+    spellInput.addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') {
+            checkSpelling();
+        }
+    });
+
+    function checkSpelling() {
+        const typed = spellInput.value.trim().toLowerCase();
+        const target = currentWordObj.word.toLowerCase();
+
+        if (typed === target) {
+            // Correct! Proceed to next card
+            spellInput.disabled = true;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="bi bi-check2"></i> Mastered';
+            
+            setTimeout(() => {
+                currentIndex++;
+                loadCard(currentIndex);
+            }, 800); // Brief pause to show success before moving on
+            
+        } else {
+            // Incorrect
+            spellInput.classList.add('is-invalid');
+            spellIcon.innerHTML = '<i class="bi bi-x-circle-fill"></i>';
+            spellIcon.classList.add('text-danger');
+            
+            // Highlight where they made the mistake (simple string comparison)
+            spellFeedback.innerHTML = `<span class="text-danger fw-bold"><i class="bi bi-exclamation-triangle"></i> Incorrect. Watch your spelling! Try again.</span>`;
+            
+            // Shake animation
+            spellInput.classList.add('shake-animation');
+            setTimeout(() => spellInput.classList.remove('shake-animation'), 500);
+        }
+    }
+
+    function updateProgress() {
+        const total = words.length;
+        const percent = (currentIndex / total) * 100;
+        document.getElementById('progress-bar').style.width = `${percent}%`;
+        document.getElementById('progress-text').innerText = `${currentIndex} / ${total} words mastered`;
+    }
+
+    // Initialize first card
+    loadCard(currentIndex);
+</script>
+
+<style>
+    /* Add a quick CSS shake animation for wrong answers */
+    @keyframes shake {
+        0% { transform: translateX(0); }
+        25% { transform: translateX(-5px); }
+        50% { transform: translateX(5px); }
+        75% { transform: translateX(-5px); }
+        100% { transform: translateX(0); }
+    }
+    .shake-animation {
+        animation: shake 0.4s ease-in-out;
+    }
+</style>
+{% endblock %}

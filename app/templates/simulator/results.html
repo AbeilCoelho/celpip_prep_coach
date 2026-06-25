@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center mt-4">
+    <div class="col-md-10">
+        
+        <!-- Header / Main Score -->
+        <div class="card shadow-sm mb-4 border-0 bg-primary text-white">
+            <div class="card-body d-flex justify-content-between align-items-center p-4">
+                <div>
+                    <h2 class="mb-0">Task 1: Email Results</h2>
+                    <p class="mb-0 opacity-75">Completed on {{ submission.created_at.strftime('%B %d, %Y') }}</p>
+                </div>
+                <div class="text-center bg-white text-primary rounded-circle d-flex flex-column justify-content-center shadow" style="width: 100px; height: 100px;">
+                    <span class="fs-6 fw-bold">CELPIP</span>
+                    <span class="fs-2 fw-bold">{{ submission.estimated_score }}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <!-- Left Column: Metrics -->
+            <div class="col-md-5">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-transparent fw-bold">
+                        <i class="bi bi-bar-chart-fill text-primary"></i> Performance Metrics
+                    </div>
+                    <div class="card-body">
+                        <!-- Task Fulfillment -->
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span>Task Fulfillment</span>
+                                <strong>{{ feedback.metrics.task_fulfillment }} / 12</strong>
+                            </div>
+                            <div class="progress" style="height: 8px;">
+                                <div class="progress-bar bg-success" style="width: {{ (feedback.metrics.task_fulfillment / 12) * 100 }}%"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- Vocabulary -->
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span>Vocabulary</span>
+                                <strong>{{ feedback.metrics.vocabulary }} / 12</strong>
+                            </div>
+                            <div class="progress" style="height: 8px;">
+                                <div class="progress-bar bg-info" style="width: {{ (feedback.metrics.vocabulary / 12) * 100 }}%"></div>
+                            </div>
+                        </div>
+
+                        <!-- Grammar -->
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span>Grammar & Sentences</span>
+                                <strong>{{ feedback.metrics.grammar }} / 12</strong>
+                            </div>
+                            <div class="progress" style="height: 8px;">
+                                <div class="progress-bar bg-warning" style="width: {{ (feedback.metrics.grammar / 12) * 100 }}%"></div>
+                            </div>
+                        </div>
+
+                        <!-- Organization -->
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span>Organization & Connectors</span>
+                                <strong>{{ feedback.metrics.organization }} / 12</strong>
+                            </div>
+                            <div class="progress" style="height: 8px;">
+                                <div class="progress-bar bg-danger" style="width: {{ (feedback.metrics.organization / 12) * 100 }}%"></div>
+                            </div>
+                        </div>
+                        
+                        <hr>
+                        <div class="d-flex justify-content-between text-muted small">
+                            <span>Word Count: <strong>{{ submission.word_count }}</strong></span>
+                            <span>Time Spent: <strong>{{ submission.time_spent_seconds // 60 }}m {{ submission.time_spent_seconds % 60 }}s</strong></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column: Feedback & Essay -->
+            <div class="col-md-7">
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-transparent fw-bold">
+                        <i class="bi bi-chat-quote-fill text-success"></i> Coach's Feedback
+                    </div>
+                    <div class="card-body bg-light">
+                        <ul class="mb-0 text-dark">
+                            {% for comment in feedback.feedback %}
+                                <li class="mb-2">{{ comment }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="card shadow-sm">
+                    <div class="card-header bg-transparent fw-bold">
+                        <i class="bi bi-file-text text-secondary"></i> Your Submission
+                    </div>
+                    <div class="card-body">
+                        <p style="white-space: pre-wrap;">{{ submission.content }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="text-center mb-5">
+            <a href="{{ url_for('main.dashboard') }}" class="btn btn-outline-primary me-2">Back to Dashboard</a>
+            <a href="{{ url_for('simulator.task1_email') }}" class="btn btn-primary">Try Another Practice</a>
+        </div>
+
+    </div>
+</div>
+{% endblock %}

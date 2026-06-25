@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Welcome Header -->
+<div class="row mb-4">
+    <div class="col">
+        <h2 class="fw-bold"><i class="bi bi-person-workspace text-primary"></i> Welcome back, {{ current_user.email.split('@')[0] }}!</h2>
+        <p class="text-muted">Here is your CELPIP Writing progress overview.</p>
+    </div>
+</div>
+
+<!-- Statistics Cards -->
+<div class="row mb-4">
+    <div class="col-md-3 mb-3">
+        <div class="card shadow-sm border-0 border-start border-primary border-4 h-100">
+            <div class="card-body">
+                <p class="text-muted mb-1 text-uppercase small fw-bold">Current Level</p>
+                <h2 class="mb-0 text-primary fw-bold">Band {{ stats.estimated_score }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card shadow-sm border-0 border-start border-success border-4 h-100">
+            <div class="card-body">
+                <p class="text-muted mb-1 text-uppercase small fw-bold">Avg. Score</p>
+                <h2 class="mb-0 text-success fw-bold">Band {{ stats.average_score }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card shadow-sm border-0 border-start border-warning border-4 h-100">
+            <div class="card-body">
+                <p class="text-muted mb-1 text-uppercase small fw-bold">Study Streak</p>
+                <h2 class="mb-0 text-warning fw-bold"><i class="bi bi-fire"></i> {{ stats.streak }} Days</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card shadow-sm border-0 border-start border-info border-4 h-100">
+            <div class="card-body">
+                <p class="text-muted mb-1 text-uppercase small fw-bold">Total Essays</p>
+                <h2 class="mb-0 text-info fw-bold">{{ stats.sessions_completed }}</h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <!-- Chart Section -->
+    <div class="col-md-8 mb-3">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-transparent fw-bold d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-graph-up text-primary"></i> Score Progression</span>
+            </div>
+            <div class="card-body">
+                {% if stats.sessions_completed > 0 %}
+                    <canvas id="scoreChart" height="100"></canvas>
+                {% else %}
+                    <div class="d-flex flex-column justify-content-center align-items-center h-100 text-muted">
+                        <i class="bi bi-bar-chart fs-1 mb-2"></i>
+                        <p>Complete a writing task to see your progress chart!</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Launch Actions -->
+    <div class="col-md-4 mb-3">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-transparent fw-bold">
+                <i class="bi bi-lightning-charge-fill text-warning"></i> Quick Practice
+            </div>
+            <div class="card-body d-flex flex-column gap-3">
+                <a href="{{ url_for('simulator.task1_email') }}" class="btn btn-outline-primary text-start">
+                    <i class="bi bi-envelope me-2"></i> Task 1: Write an Email
+                </a>
+                <a href="{{ url_for('simulator.task2_survey') }}" class="btn btn-outline-success text-start">
+                    <i class="bi bi-ui-checks me-2"></i> Task 2: Survey Response
+                </a>
+                <a href="{{ url_for('learning.vocabulary_trainer') }}" class="btn btn-outline-info text-start">
+                    <i class="bi bi-spellcheck me-2"></i> Vocabulary Trainer
+                </a>
+                <a href="{{ url_for('learning.phrase_bank') }}" class="btn btn-outline-warning text-start">
+                    <i class="bi bi-keyboard me-2"></i> Phrase Typing Challenge
+                </a>
+                <a href="{{ url_for('learning.vocab_drop') }}" class="btn btn-outline-danger text-start">
+                    <i class="bi bi-keyboard me-2"></i> Vocab Drop Game
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Activity Table -->
+<div class="row">
+    <div class="col-12">
+        <div class="card shadow-sm">
+            <div class="card-header bg-transparent fw-bold">
+                <i class="bi bi-clock-history text-secondary"></i> Recent Activity
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0 align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-4">Date</th>
+                                <th>Task Type</th>
+                                <th>Word Count</th>
+                                <th>Score</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for sub in recent_subs %}
+                            <tr>
+                                <td class="ps-4">{{ sub.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                                <td>
+                                    <span class="badge {% if sub.task_type == 'Email' %}bg-primary{% else %}bg-success{% endif %}">
+                                        {{ sub.task_type }}
+                                    </span>
+                                </td>
+                                <td>{{ sub.word_count }} words</td>
+                                <td><strong class="text-primary">Band {{ sub.estimated_score }}</strong></td>
+                                <td>
+                                    <a href="{{ url_for('simulator.results', submission_id=sub.id) }}" class="btn btn-sm btn-outline-secondary">View Feedback</a>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="5" class="text-center py-4 text-muted">
+                                    No practice sessions completed yet. Click "Quick Practice" to start!
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Include Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+    {% if stats.sessions_completed > 0 %}
+    const ctx = document.getElementById('scoreChart').getContext('2d');
+    
+    // Injecting Python lists safely into JavaScript
+    const labels = {{ chart_labels | tojson }};
+    const dataPoints = {{ chart_scores | tojson }};
+
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'CELPIP Estimated Score',
+                data: dataPoints,
+                borderColor: '#0d6efd', // Bootstrap primary color
+                backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                borderWidth: 3,
+                pointBackgroundColor: '#0d6efd',
+                pointRadius: 4,
+                fill: true,
+                tension: 0.3 // Smooth curves
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    min: 4,
+                    max: 12, // CELPIP score bounds
+                    ticks: {
+                        stepSize: 1
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false // Hide legend for cleaner look
+                }
+            }
+        }
+    });
+    {% endif %}
+</script>
+{% endblock %}

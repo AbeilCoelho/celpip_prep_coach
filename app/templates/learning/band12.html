@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block content %}
+<h2 class="mb-4"><i class="bi bi-book"></i> Band 12 Reference Library</h2>
+<div class="row">
+    <div class="col-md-4">
+        <div class="list-group" id="list-tab" role="tablist">
+            {% for ex in examples %}
+            <a class="list-group-item list-group-item-action {% if loop.first %}active{% endif %}" id="list-{{ loop.index }}-list" data-bs-toggle="list" href="#list-{{ loop.index }}" role="tab">
+                <strong>{{ ex.task_type }}</strong>: {{ ex.topic }}
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    <div class="col-md-8">
+        <div class="tab-content" id="nav-tabContent">
+            {% for ex in examples %}
+            <div class="tab-pane fade {% if loop.first %}show active{% endif %}" id="list-{{ loop.index }}" role="tabpanel">
+                <div class="card shadow-sm mb-3">
+                    <div class="card-header bg-light"><strong>Prompt:</strong> {{ ex.prompt }}</div>
+                    <div class="card-body fs-5" style="white-space: pre-wrap;">{{ ex.response }}</div>
+                    <div class="card-footer text-muted small">
+                        Notice the use of formal tone, clear paragraphing, and advanced connectors like <em>Furthermore</em> or <em>Consequently</em>.
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
